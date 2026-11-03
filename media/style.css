@@ -16,3 +16,5 @@ html,body,#app{background-color:var(--vscode-titleBar-activeBackground,var(--vsc
 header{min-height:32px;padding:2px 8px}#query{padding:2px 6px}.toggle{padding:3px}
 
 .toggle{border-radius:4px}
+
+.file{font:inherit;font-family:var(--vscode-editor-font-family,monospace);flex:none}
