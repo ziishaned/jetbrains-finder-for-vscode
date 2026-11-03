@@ -17,6 +17,7 @@ function activate(context) {
   function stop() { generation++; for (const p of processes) p.kill(); processes = []; }
   async function search(options) {
     stop(); const current = generation; matches = [];
+    if (panel) panel.title = 'Find in Files';
     const folders = vscode.workspace.workspaceFolders || [];
     if (!options.query) { panel.webview.postMessage({ type: 'results', items: [], count: 0, done: true }); return; }
     if (!folders.length) { panel.webview.postMessage({ type: 'error', message: 'Open a folder or workspace to search.' }); return; }
@@ -36,7 +37,7 @@ function activate(context) {
       const args = buildArgs(options, config);
       const child = spawn(rgPath, args, {cwd:root, windowsHide:true}); processes.push(child);
       let stderr = '', batch = [], timer;
-      const flush = () => { clearTimeout(timer); timer = undefined; if (batch.length && current === generation) { panel.webview.postMessage({type:'append', items:batch, count:matches.length, files:files.size}); batch=[]; } };
+      const flush = () => { clearTimeout(timer); timer = undefined; if (batch.length && current === generation && panel) { panel.title = `Find in Files  ${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}`; panel.webview.postMessage({type:'append', items:batch, count:matches.length, files:files.size}); batch=[]; } };
       readline.createInterface({input:child.stdout}).on('line', line => {
         if (current !== generation || truncated) return;
         try {
@@ -52,7 +53,7 @@ function activate(context) {
       child.on('error', e => { errors.push(e.message); });
       child.on('close', code => { flush(); if (code > 1 && stderr) errors.push(stderr.trim()); if (--remaining === 0) finish(); });
     }
-    function finish() { if (current !== generation) return; processes = []; panel.webview.postMessage({type:'done', count:matches.length, files:files.size, truncated, error:errors.join('\n')}); }
+    function finish() { if (current !== generation || !panel) return; processes = []; panel.title = `Find in Files  ${truncated ? 'First ' : ''}${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}${truncated ? ' (limit reached)' : ''}`; panel.webview.postMessage({type:'done', count:matches.length, files:files.size, truncated, error:errors.join('\n')}); }
   }
   async function highlightResults(ids) {
     const active = syntaxGeneration, current = generation;
@@ -122,7 +123,6 @@ function activate(context) {
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
     originalColumn = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
     panel = vscode.window.createWebviewPanel('jetbrainsFinder', 'Find in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
-    panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'empty-icon.svg');
     const webview = panel.webview, script = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','main.js')), style = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','style.css'));
     const icons = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist','codicon.css'));
     const syntax = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','syntax.js'));

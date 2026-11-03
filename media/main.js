@@ -79,7 +79,7 @@ function drawPreview(m){
   const bottom=document.createElement('div');bottom.style.height=`${Math.max(0,info.lineCount-m.first-m.lines.length)*height}px`;fragment.append(bottom);
   preview.replaceChildren(fragment);
 }
-function append(item){ const row=document.createElement('div'); row.className='result'; row.dataset.id=item.id; row.setAttribute('role','option'); const content=document.createElement('span'); content.className='result-text'; window.renderSyntax(content,item.snippet.text,item.label,item.snippet.start,item.snippet.end); const file=document.createElement('span'); file.className='file'; file.textContent=`${item.label}:${item.line+1}`; row.append(content,file); row.addEventListener('click',()=>select(item.id)); row.addEventListener('dblclick',()=>vscode.postMessage({type:'open',id:item.id})); results.append(row); }
+function append(item){ const row=document.createElement('div'); row.className='result'; row.dataset.id=item.id; row.setAttribute('role','option'); const content=document.createElement('span'); content.className='result-text'; window.renderSyntax(content,item.snippet.text,item.label,item.snippet.start,item.snippet.end); const file=document.createElement('span'); file.className='file'; file.textContent=`${item.label.split(/[\\/]/).pop()}:${item.line+1}`; file.title=`${item.label}:${item.line+1}`; row.append(content,file); row.addEventListener('click',()=>select(item.id)); row.addEventListener('dblclick',()=>vscode.postMessage({type:'open',id:item.id})); results.append(row); }
 for(const id of ['case','word','regex']) $(id).addEventListener('click',()=>{$(id).setAttribute('aria-pressed',String($(id).getAttribute('aria-pressed')!=='true'));schedule();});
 query.addEventListener('input',schedule); $('directory').addEventListener('input',schedule); $('roots').addEventListener('change',schedule);
 for(const button of document.querySelectorAll('.scope')) button.addEventListener('click',()=>{scope=button.dataset.scope; document.querySelectorAll('.scope').forEach(b=>b.classList.toggle('active',b===button)); $('roots').hidden=scope!=='folder'; $('directory').hidden=scope!=='directory'; schedule();});
@@ -93,7 +93,10 @@ window.addEventListener('message',event=>{const m=event.data;
  if(m.type==='done'){ $('status').textContent=`${m.truncated?'First ':''}${m.count} ${m.count===1?'match':'matches'} in ${m.files} ${m.files===1?'file':'files'}${m.truncated?' (limit reached)':''}`;if(m.error){const e=document.createElement('div');e.className='error';e.textContent=m.error;results.append(e);}else if(!m.count)results.innerHTML='<div class="empty">No matches found.</div>';}
  if(m.type==='error'){$('status').textContent='Search unavailable';results.classList.add('empty-state');results.textContent=m.message;}
  if(m.type==='previewInfo' && m.id===selected){
-   previewInfo=m; $('previewHead').textContent=m.label;preview.textContent='';
+   previewInfo=m;
+   const previewHead=$('previewHead'), parts=m.label.split(/[\\/]/), name=parts.pop(), filename=document.createElement('span'), folder=document.createElement('span');
+   filename.className='preview-filename'; filename.textContent=name; folder.className='preview-folder'; folder.textContent=parts.join('/');
+   previewHead.replaceChildren(filename,folder); previewHead.title=m.label;preview.textContent='';
    const placeholder=document.createElement('div');placeholder.style.height=`${m.lineCount*lineHeight()}px`;preview.append(placeholder);
    preview.scrollTop=Math.max(0,(m.line+0.5)*lineHeight()-preview.clientHeight/2);requestPreviewLines();
  }
