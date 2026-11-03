@@ -1,8 +1,8 @@
-# VS Code JetBrains Finder
+# JetBrains Finder for VS Code
 
 Search a workspace in a JetBrains-inspired view with live results and a preview of the selected match. On recent versions of VS Code, the view can open as a floating modal editor over your code.
 
-<img width="1604" height="1192" alt="" src="https://i.imgur.com/xfAVo0q.png" />
+![Find in Files showing search results and a code preview](https://i.imgur.com/JGqIM4A.png)
 
 ## Enable the modal
 

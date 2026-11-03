@@ -1,12 +1,12 @@
 const vscode = require('vscode');
 const { spawn } = require('child_process');
 const readline = require('readline');
-const { rgPath } = require('@vscode/ripgrep');
 const { buildArgs, parseMatch, selectSearchRoots } = require('./search');
 const { createSyntax } = require('./syntax');
 const { getPreviewRange, createRowMap, rowPosition, segmentRange, matchRow, resultSnippet } = require('./preview');
 
-function activate(context) {
+async function activate(context) {
+  const { rgPath } = await import('@vscode/ripgrep');
   let panel, processes = [], generation = 0, matches = [], originalColumn, selectedDirectory;
   const syntax = createSyntax(vscode);
   let syntaxGeneration = 0;
@@ -107,6 +107,13 @@ function activate(context) {
       if (sequence === previewSequence && request === previewRequest && current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'previewLines', id, serial, first:range.start, lines});
     } catch (error) { if (panel && sequence === previewSequence && request === previewRequest) panel.webview.postMessage({type:'previewError',id,message:error.message}); }
   }
+  for (const [name, target] of [['quickOpen', 'workbench.action.quickOpen'], ['commands', 'workbench.action.showCommands']]) {
+    context.subscriptions.push(vscode.commands.registerCommand(`jetbrainsFinder.${name}`, async () => {
+      panel?.dispose();
+      await new Promise(resolve => setTimeout(resolve, 150));
+      await vscode.commands.executeCommand(target);
+    }));
+  }
   context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.open', (initialQuery) => {
     const selected = typeof initialQuery === 'string' ? initialQuery : (vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '');
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
@@ -118,6 +125,14 @@ function activate(context) {
     const icons = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist','codicon.css'));
     const nonce = require('crypto').randomBytes(16).toString('base64');
     webview.html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${icons}"><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
+    panel.onDidChangeViewState(async event => {
+      const owner = event.webviewPanel;
+      if (owner.active || panel !== owner || vscode.workspace.getConfiguration('workbench.editor').get('useModal') !== 'all') return;
+      const group = vscode.window.tabGroups.all.find(group => group.tabs.some(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType === 'jetbrainsFinder'));
+      if (!group || group.tabs.length !== 2 || !(group.activeTab?.input instanceof vscode.TabInputText)) return;
+      owner.dispose();
+      await vscode.commands.executeCommand('workbench.action.moveModalEditorToMain');
+    });
     panel.onDidDispose(() => {stop(); panel = undefined;});
     webview.onDidReceiveMessage(async message => {
       if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected, directory:selectedDirectory?.fsPath || ''});
