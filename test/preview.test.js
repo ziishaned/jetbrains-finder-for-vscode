@@ -32,3 +32,19 @@ test('wrapped rows do not split a surrogate pair', () => {
   assert.equal(matchRow(map,doc,0,19),1);
   assert.equal(text.slice(segmentBoundary(text,20),segmentBoundary(text,40)).startsWith('😀'),true);
 });
+
+test('result snippets start at a complete word and retain the correct match offsets', () => {
+  const {resultSnippet}=require('../src/preview');
+  const text='prefix '.repeat(12)+'explanation before something and after';
+  const start=text.indexOf('something');
+  const snippet=resultSnippet({text,start,end:start+9}, 30);
+  const firstWord=snippet.text.match(/^\s*([\p{L}\p{N}_]+)/u)?.[1];
+  assert.ok(firstWord);
+  assert.ok(text.slice(0,start).includes(firstWord));
+  assert.equal(snippet.text.slice(snippet.start,snippet.end),'something');
+  const word='a'.repeat(50)+' résumé before something';
+  const matched=word.indexOf('something');
+  const full=resultSnippet({text:word,start:matched,end:matched+9}, 12);
+  assert.ok(full.text.startsWith('résumé'));
+  assert.equal(full.text.slice(full.start,full.end),'something');
+});

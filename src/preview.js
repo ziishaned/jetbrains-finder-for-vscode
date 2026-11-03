@@ -25,7 +25,17 @@ function matchRow(map, doc, line, character) {
   return map.offsets[line]+part;
 }
 function resultSnippet(item, context=40, length=140) {
-  const from=Math.max(0,item.start-context), to=Math.min(item.text.length,Math.max(from+length,item.end));
-  return {text:item.text.slice(from,to)+(to<item.text.length?'…':''),start:item.start-from,end:item.end-from};
+  const text=item.text, isWord = character => character !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(character);
+  let from=segmentBoundary(text,Math.max(0,item.start-context));
+  // Move to the beginning of a word only when the cut would split one.
+  if(from>0 && isWord(String.fromCodePoint(text.codePointAt(from)))) {
+    while(from>0){
+      const previous=from-(text.charCodeAt(from-1)>=0xDC00 && text.charCodeAt(from-1)<=0xDFFF ? 2 : 1);
+      if(!isWord(String.fromCodePoint(text.codePointAt(previous))))break;
+      from=previous;
+    }
+  }
+  const to=Math.min(text.length,Math.max(from+length,item.end));
+  return {text:text.slice(from,to),start:item.start-from,end:item.end-from};
 }
 module.exports = { getPreviewRange, createRowMap, rowPosition, segmentBoundary, matchRow, resultSnippet };

@@ -122,6 +122,7 @@ function activate(context) {
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
     originalColumn = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
     panel = vscode.window.createWebviewPanel('jetbrainsFinder', 'Find in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
+    panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'empty-icon.svg');
     const webview = panel.webview, script = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','main.js')), style = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','style.css'));
     const icons = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist','codicon.css'));
     const syntax = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','syntax.js'));
