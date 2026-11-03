@@ -28,3 +28,22 @@ test('invalid regular expressions are reported by the search engine', () => {
   const run=spawnSync(rgPath,buildArgs({query:'[',regex:true}),{cwd:os.tmpdir(),encoding:'utf8'});
   assert.equal(run.status,2); assert.match(run.stderr,/regex parse error/i);
 });
+
+test('directory scope searches the picked folder rather than other workspace roots', () => {
+  const {selectSearchRoots}=require('../src/search');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finder-scope-'));
+  try {
+    const picked=path.join(dir,'selected'), other=path.join(dir,'other');
+    fs.mkdirSync(picked);fs.mkdirSync(other);
+    fs.writeFileSync(path.join(picked,'one.txt'),'needle');fs.writeFileSync(path.join(other,'two.txt'),'needle');
+    const uri=p=>({scheme:'file',fsPath:p,toString:()=>p});
+    const folders=[{uri:uri(dir)}], chosen=uri(picked);
+    assert.deepEqual(selectSearchRoots('directory',folders,undefined),[]);
+    const roots=selectSearchRoots('directory',folders,chosen);
+    assert.equal(roots.length,1);assert.equal(roots[0].uri.fsPath,picked);
+    const result=spawnSync(rgPath,buildArgs({query:'needle'}),{cwd:roots[0].uri.fsPath,encoding:'utf8'});
+    const matches=result.stdout.trim().split('\n').map(JSON.parse).filter(event=>event.type==='match');
+    assert.equal(matches.length,1);assert.equal(matches[0].data.path.text,'./one.txt');
+    assert.equal(selectSearchRoots('project',folders,chosen)[0].uri.fsPath,dir);
+  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+});

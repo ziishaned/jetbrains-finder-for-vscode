@@ -24,4 +24,9 @@ function parseMatch(data, root) {
     text: line
   }));
 }
-module.exports = { buildArgs, parseMatch };
+function selectSearchRoots(scope, folders, selectedDirectory, selectedRoot) {
+  if (scope === 'directory') return selectedDirectory ? [{uri:selectedDirectory}] : [];
+  if (scope === 'folder' && selectedRoot) return folders.filter(folder => folder.uri.toString() === selectedRoot);
+  return folders;
+}
+module.exports = { buildArgs, parseMatch, selectSearchRoots };

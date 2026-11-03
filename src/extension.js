@@ -1,15 +1,14 @@
 const vscode = require('vscode');
-const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
 const { rgPath } = require('@vscode/ripgrep');
-const { buildArgs, parseMatch } = require('./search');
+const { buildArgs, parseMatch, selectSearchRoots } = require('./search');
 const { openQuickSearch } = require('./quickSearch');
 const { createSyntax } = require('./syntax');
 const { getPreviewRange, createRowMap, rowPosition, segmentRange, matchRow, resultSnippet } = require('./preview');
 
 function activate(context) {
-  let panel, processes = [], generation = 0, matches = [], originalColumn;
+  let panel, processes = [], generation = 0, matches = [], originalColumn, selectedDirectory;
   const syntax = createSyntax(vscode);
   let syntaxGeneration = 0;
   const refreshSyntax = () => { syntaxGeneration++; syntax.reset(); panel?.webview.postMessage({type:'refreshSyntax'}); };
@@ -20,19 +19,14 @@ function activate(context) {
     if (panel) panel.title = 'Find in Files';
     const folders = vscode.workspace.workspaceFolders || [];
     if (!options.query) { panel.webview.postMessage({ type: 'results', items: [], count: 0, done: true }); return; }
-    if (!folders.length) { panel.webview.postMessage({ type: 'error', message: 'Open a folder or workspace to search.' }); return; }
-    const roots = options.scope === 'folder' && options.root ? folders.filter(f => f.uri.toString() === options.root) : folders;
-    if (!roots.length || roots.some(f => f.uri.scheme !== 'file')) { panel.webview.postMessage({type:'error', message:'This search currently supports local folders and remote workspaces with file-based folders.'}); return; }
+    const roots = selectSearchRoots(options.scope, folders, selectedDirectory, options.root);
+    if (!roots.length) { panel.webview.postMessage({ type:'error', message:options.scope === 'directory' ? 'Choose a directory to search.' : 'Open a folder or workspace to search.' }); return; }
+    if (roots.some(f => f.uri.scheme !== 'file')) { panel.webview.postMessage({type:'error', message:'This search currently supports file-based folders.'}); return; }
     let remaining = roots.length, truncated = false, errors = [];
     const files = new Set();
     panel.webview.postMessage({type:'results', items:[], count:0, done:false});
     for (const folder of roots) {
-      let root = folder.uri.fsPath;
-      if (options.directory && options.scope === 'directory') {
-        const candidate = path.resolve(root, options.directory);
-        if (candidate !== root && !candidate.startsWith(root + path.sep)) { errors.push('Directory must be inside a workspace folder.'); if (--remaining === 0) finish(); continue; }
-        root = candidate;
-      }
+      const root = folder.uri.fsPath;
       const config = vscode.workspace.getConfiguration('search', folder.uri).get('exclude', {});
       const args = buildArgs(options, config);
       const child = spawn(rgPath, args, {cwd:root, windowsHide:true}); processes.push(child);
@@ -121,6 +115,8 @@ function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.open', (initialQuery) => {
     const selected = typeof initialQuery === 'string' ? initialQuery : (vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '');
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    if (!selectedDirectory) selectedDirectory = (activeDocument && vscode.workspace.getWorkspaceFolder(activeDocument.uri)?.uri) || vscode.workspace.workspaceFolders?.[0]?.uri;
     originalColumn = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
     panel = vscode.window.createWebviewPanel('jetbrainsFinder', 'Find in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
     const webview = panel.webview, script = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','main.js')), style = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','style.css'));
@@ -130,7 +126,15 @@ function activate(context) {
     webview.html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${icons}"><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${syntax}"></script><script nonce="${nonce}" src="${script}"></script></body></html>`;
     panel.onDidDispose(() => {stop(); panel = undefined;});
     webview.onDidReceiveMessage(async message => {
-      if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected});
+      if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected, directory:selectedDirectory?.fsPath || ''});
+      else if (message.type === 'chooseDirectory') {
+        const owner = panel;
+        const picked = await vscode.window.showOpenDialog({canSelectFiles:false, canSelectFolders:true, canSelectMany:false, openLabel:'Select Directory', defaultUri:selectedDirectory || vscode.workspace.workspaceFolders?.[0]?.uri});
+        if (panel !== owner || !panel || !picked?.length) return;
+        if (picked[0].scheme !== 'file') { vscode.window.showWarningMessage('Choose a file-based directory.'); return; }
+        selectedDirectory = picked[0];
+        webview.postMessage({type:'directorySelected', path:selectedDirectory.fsPath});
+      }
       else if (message.type === 'search') search(message.options);
       else if (message.type === 'preview') preview(message.id, message.columns);
       else if (message.type === 'previewLines' && Number.isInteger(message.id)) previewLines(message.id, message.start, message.end, message.serial);
