@@ -16,3 +16,5 @@ header{min-height:32px;padding:2px 8px}#query{padding:2px 6px}.toggle{padding:3p
 .toggle{border-radius:4px}
 
 .file{font:inherit;font-family:var(--vscode-editor-font-family,monospace);flex:none}
+
+.replace-field{display:flex;align-items:center;gap:4px;margin:0 8px 6px;padding:2px 8px;min-height:32px;border:1px solid var(--vscode-input-border,var(--vscode-editorWidget-border,var(--vscode-panel-border)));border-radius:4px}.replace-field:focus-within,header:focus-within{border-color:var(--vscode-focusBorder)}#replacement{flex:1;min-width:0;border:0;background:transparent;outline:none;padding:2px 6px}.footer-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}

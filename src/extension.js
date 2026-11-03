@@ -1,21 +1,23 @@
 const vscode = require('vscode');
 const { spawn } = require('child_process');
 const readline = require('readline');
-const { rgPath } = require('@vscode/ripgrep');
 const { buildArgs, parseMatch, selectSearchRoots } = require('./search');
+const { replacementFor } = require('./replace');
+const { replacementTabsToClose } = require('./replacement-tabs');
 const { createSyntax } = require('./syntax');
 const { getPreviewRange, createRowMap, rowPosition, segmentRange, matchRow, resultSnippet } = require('./preview');
 
-function activate(context) {
-  let panel, processes = [], generation = 0, matches = [], originalColumn, selectedDirectory;
+async function activate(context) {
+  const { rgPath } = await import('@vscode/ripgrep');
+  let panel, processes = [], generation = 0, matches = [], originalColumn, selectedDirectory, completedSearch, replacing = false;
   const syntax = createSyntax(vscode);
   let syntaxGeneration = 0;
   const refreshSyntax = () => { syntaxGeneration++; syntax.reset(); panel?.webview.postMessage({type:'refreshSyntax'}); };
   context.subscriptions.push(vscode.window.onDidChangeActiveColorTheme(refreshSyntax), vscode.workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('workbench.colorTheme') || event.affectsConfiguration('editor.tokenColorCustomizations')) refreshSyntax(); }), vscode.extensions.onDidChange(refreshSyntax));
   function stop() { generation++; for (const p of processes) p.kill(); processes = []; }
   async function search(options) {
-    stop(); const current = generation; matches = [];
-    if (panel) panel.title = 'Find in Files';
+    stop(); const current = generation; matches = []; completedSearch = undefined;
+    if (panel) panel.title = 'Replace in Files';
     const folders = vscode.workspace.workspaceFolders || [];
     if (!options.query) { panel.webview.postMessage({ type: 'results', items: [], count: 0, done: true }); return; }
     const roots = selectSearchRoots(options.scope, folders, selectedDirectory, options.root);
@@ -30,7 +32,7 @@ function activate(context) {
       const args = buildArgs(options, config);
       const child = spawn(rgPath, args, {cwd:root, windowsHide:true}); processes.push(child);
       let stderr = '', batch = [], timer;
-      const flush = () => { clearTimeout(timer); timer = undefined; if (batch.length && current === generation && panel) { panel.title = `Find in Files  ${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}`; panel.webview.postMessage({type:'append', items:batch, count:matches.length, files:files.size}); batch=[]; } };
+      const flush = () => { clearTimeout(timer); timer = undefined; if (batch.length && current === generation && panel) { panel.title = `Replace in Files  ${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}`; panel.webview.postMessage({type:'append', items:batch, count:matches.length, files:files.size}); batch=[]; } };
       readline.createInterface({input:child.stdout}).on('line', line => {
         if (current !== generation || truncated) return;
         try {
@@ -46,7 +48,49 @@ function activate(context) {
       child.on('error', e => { errors.push(e.message); });
       child.on('close', code => { flush(); if (code > 1 && stderr) errors.push(stderr.trim()); if (--remaining === 0) finish(); });
     }
-    function finish() { if (current !== generation || !panel) return; processes = []; panel.title = `Find in Files  ${truncated ? 'First ' : ''}${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}${truncated ? ' (limit reached)' : ''}`; panel.webview.postMessage({type:'done', count:matches.length, files:files.size, truncated, error:errors.join('\n')}); }
+    function finish() { if (current !== generation || !panel) return; processes = []; completedSearch = {options, truncated, error:errors.length > 0}; panel.title = `Replace in Files  ${truncated ? 'First ' : ''}${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in ${files.size} ${files.size === 1 ? 'file' : 'files'}${truncated ? ' (limit reached)' : ''}`; panel.webview.postMessage({type:'done', count:matches.length, files:files.size, truncated, error:errors.join('\n')}); }
+  }
+  async function replaceMatches(message) {
+    const owner = panel, state = completedSearch, current = generation;
+    if (!owner || !state || state.error || (message.all && state.truncated)) return;
+    const targets = message.all ? matches.slice() : [matches[message.id]].filter(Boolean);
+    if (!targets.length) return;
+    completedSearch = undefined;
+    replacing = true;
+    owner.webview.postMessage({type:'replacing'});
+    let tabSnapshot;
+    try {
+      const documents = new Map(), edits = new vscode.WorkspaceEdit(), seen = new Set();
+      for (const item of targets) {
+        const key = `${item.file}:${item.line}:${item.start}:${item.end}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let doc = documents.get(item.file);
+        if (!doc) { doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.file)); if (doc.isDirty) throw new Error(`Save the unsaved changes in ${item.label} before replacing.`); documents.set(item.file, {doc, version:doc.version}); } else doc = doc.doc;
+        if (doc.lineCount <= item.line || doc.lineAt(item.line).text !== item.text) throw new Error(`File changed since the search: ${item.label}. Save changes and search again.`);
+        const value = replacementFor(item, state.options, message.replacement);
+        edits.replace(doc.uri, new vscode.Range(item.line, item.start, item.line, item.end), value);
+      }
+      if (panel !== owner || generation !== current) return;
+      if ([...documents.values()].some(({doc, version}) => doc.version !== version || doc.isDirty)) throw new Error('A file changed during replacement. Save changes and search again.');
+      const originalTabs = vscode.window.tabGroups.all.flatMap(group => group.tabs);
+      tabSnapshot = {tabs:new Set(originalTabs), uris:new Set(originalTabs.map(tab => tab.input?.uri?.toString()).filter(Boolean)), targets:new Set([...documents.values()].map(({doc}) => doc.uri.toString()))};
+      if (!await vscode.workspace.applyEdit(edits)) throw new Error('VS Code could not apply the replacement.');
+      const saved = await Promise.all([...documents.values()].map(({doc}) => doc.save()));
+      if (saved.some(ok => !ok)) throw new Error('Some replacements could not be saved. Check the affected files.');
+      if (panel === owner && generation === current) search(state.options);
+    } catch (error) {
+      if (panel === owner && generation === current) {
+        vscode.window.showErrorMessage(error.message);
+        search(state.options);
+      }
+    } finally {
+      if (tabSnapshot) {
+        const opened = replacementTabsToClose(vscode.window.tabGroups.all, tabSnapshot.tabs, tabSnapshot.uris, tabSnapshot.targets);
+        if (opened.length) await vscode.window.tabGroups.close(opened, true);
+      }
+      replacing = false;
+    }
   }
   async function highlightResults(ids) {
     const active = syntaxGeneration, current = generation;
@@ -107,17 +151,35 @@ function activate(context) {
       if (sequence === previewSequence && request === previewRequest && current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'previewLines', id, serial, first:range.start, lines});
     } catch (error) { if (panel && sequence === previewSequence && request === previewRequest) panel.webview.postMessage({type:'previewError',id,message:error.message}); }
   }
-  context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.open', (initialQuery) => {
+  for (const [name, target] of [['quickOpen', 'workbench.action.quickOpen'], ['commands', 'workbench.action.showCommands']]) {
+    context.subscriptions.push(vscode.commands.registerCommand(`jetbrainsReplacer.${name}`, async () => {
+      panel?.dispose();
+      await new Promise(resolve => setTimeout(resolve, 150));
+      await vscode.commands.executeCommand(target);
+    }));
+  }
+  context.subscriptions.push(vscode.commands.registerCommand('jetbrainsReplacer.open', (initialQuery) => {
     const selected = typeof initialQuery === 'string' ? initialQuery : (vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '');
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
     const activeDocument = vscode.window.activeTextEditor?.document;
     if (!selectedDirectory) selectedDirectory = (activeDocument && vscode.workspace.getWorkspaceFolder(activeDocument.uri)?.uri) || vscode.workspace.workspaceFolders?.[0]?.uri;
     originalColumn = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
-    panel = vscode.window.createWebviewPanel('jetbrainsFinder', 'Find in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
+    panel = vscode.window.createWebviewPanel('jetbrainsReplacer', 'Replace in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
     const webview = panel.webview, script = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','main.js')), style = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','style.css'));
     const icons = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist','codicon.css'));
     const nonce = require('crypto').randomBytes(16).toString('base64');
     webview.html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${icons}"><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
+    // When Quick Open selects a file while the modal is open, VS Code places it
+    // alongside the webview. Close the dialog and move that editor back to the
+    // main window, so navigation behaves like leaving a modal dialog.
+    panel.onDidChangeViewState(async event => {
+      const owner = event.webviewPanel;
+      if (owner.active || replacing || panel !== owner || vscode.workspace.getConfiguration('workbench.editor').get('useModal') !== 'all') return;
+      const group = vscode.window.tabGroups.all.find(group => group.tabs.some(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType === 'jetbrainsReplacer'));
+      if (!group || group.tabs.length !== 2 || !(group.activeTab?.input instanceof vscode.TabInputText)) return;
+      owner.dispose();
+      await vscode.commands.executeCommand('workbench.action.moveModalEditorToMain');
+    });
     panel.onDidDispose(() => {stop(); panel = undefined;});
     webview.onDidReceiveMessage(async message => {
       if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected, directory:selectedDirectory?.fsPath || ''});
@@ -130,6 +192,7 @@ function activate(context) {
         webview.postMessage({type:'directorySelected', path:selectedDirectory.fsPath});
       }
       else if (message.type === 'search') search(message.options);
+      else if (message.type === 'replace' && typeof message.replacement === 'string') replaceMatches(message);
       else if (message.type === 'preview') preview(message.id, message.columns);
       else if (message.type === 'previewLines' && Number.isInteger(message.id)) previewLines(message.id, message.start, message.end, message.serial);
       else if (message.type === 'highlightResults' && Array.isArray(message.ids)) highlightResults(message.ids.filter(Number.isInteger));

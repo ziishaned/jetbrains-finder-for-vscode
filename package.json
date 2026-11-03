@@ -1,9 +1,9 @@
 {
-  "name": "jetbrains-find-in-files",
-  "displayName": "VS Code JetBrains Finder",
-  "description": "Search your workspace with a live results list and code preview.",
-  "version": "0.3.63",
-  "publisher": "local",
+  "name": "jetbrains-replace-in-files",
+  "displayName": "JetBrains Replace in Files for VS Code",
+  "description": "Find and replace across your workspace with live results and code preview.",
+  "version": "0.1.12",
+  "publisher": "ziishaned",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -12,22 +12,40 @@
   ],
   "main": "./src/extension.js",
   "activationEvents": [
-    "onCommand:jetbrainsFinder.open"
+    "onCommand:jetbrainsReplacer.open"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "jetbrainsFinder.open",
-        "title": "Find in Files",
-        "category": "JetBrains Finder"
+        "command": "jetbrainsReplacer.open",
+        "title": "Replace in Files",
+        "category": "JetBrains Replace"
       }
     ],
     "keybindings": [
       {
-        "command": "jetbrainsFinder.open",
-        "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f",
+        "command": "jetbrainsReplacer.open",
+        "key": "ctrl+shift+h",
+        "mac": "cmd+shift+r",
         "when": "!inDebugRepl"
+      },
+      {
+        "command": "jetbrainsReplacer.quickOpen",
+        "key": "ctrl+p",
+        "mac": "cmd+p",
+        "when": "activeWebviewPanelId == jetbrainsReplacer"
+      },
+      {
+        "command": "jetbrainsReplacer.quickOpen",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o",
+        "when": "activeWebviewPanelId == jetbrainsReplacer"
+      },
+      {
+        "command": "jetbrainsReplacer.commands",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p",
+        "when": "activeWebviewPanelId == jetbrainsReplacer"
       }
     ]
   },
@@ -46,5 +64,5 @@
   "devDependencies": {
     "@vscode/vsce": "^3.6.0"
   },
-  "icon": "assets/icon.png"
+  "icon": "assets/replace-icon.png"
 }
