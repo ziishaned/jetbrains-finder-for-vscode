@@ -8,6 +8,5 @@ node_modules/@vscode/codicons/dist/*.csv
 node_modules/@vscode/codicons/dist/*.ts
 node_modules/@vscode/codicons/dist/*.json
 
-node_modules/highlight.js/**
 
 assets/concepts/**

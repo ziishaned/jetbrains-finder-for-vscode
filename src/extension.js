@@ -57,7 +57,7 @@ function activate(context) {
         const grammar = await syntax.grammarFor(item.file);
         if (active !== syntaxGeneration || current !== generation || !panel) return;
         if (grammar) batch.push({id, spans:syntax.tokenize(grammar, item.snippet.text, null).spans});
-      } catch { /* Keep the webview fallback when a grammar fails. */ }
+      } catch { /* Leave the result as plain text if its grammar fails. */ }
       if (batch.length >= 40) { panel.webview.postMessage({type:'resultSyntax', items:batch.splice(0)}); }
     }
     if (batch.length && panel && current === generation && active === syntaxGeneration) panel.webview.postMessage({type:'resultSyntax', items:batch});
@@ -103,7 +103,7 @@ function activate(context) {
             if(i>=first)for(const line of lines)if(line.sourceLine===i){const end=line.from+line.text.length;line.spans=tokenized.spans.filter(span=>span.end>line.from&&span.start<end).map(span=>({...span,start:Math.max(span.start,line.from)-line.from,end:Math.min(span.end,end)-line.from}));}
           }
         }
-      } catch { /* Use the webview fallback if highlighting fails. */ }
+      } catch { /* Leave preview text uncolored if highlighting fails. */ }
       if (sequence === previewSequence && request === previewRequest && current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'previewLines', id, serial, first:range.start, lines});
     } catch (error) { if (panel && sequence === previewSequence && request === previewRequest) panel.webview.postMessage({type:'previewError',id,message:error.message}); }
   }
@@ -116,9 +116,8 @@ function activate(context) {
     panel = vscode.window.createWebviewPanel('jetbrainsFinder', 'Find in Files', vscode.ViewColumn.Active, {enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'media'), vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist')]});
     const webview = panel.webview, script = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','main.js')), style = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','style.css'));
     const icons = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'node_modules','@vscode','codicons','dist','codicon.css'));
-    const syntax = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'media','syntax.js'));
     const nonce = require('crypto').randomBytes(16).toString('base64');
-    webview.html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${icons}"><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${syntax}"></script><script nonce="${nonce}" src="${script}"></script></body></html>`;
+    webview.html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${icons}"><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
     panel.onDidDispose(() => {stop(); panel = undefined;});
     webview.onDidReceiveMessage(async message => {
       if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected, directory:selectedDirectory?.fsPath || ''});
