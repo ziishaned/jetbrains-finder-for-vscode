@@ -6,6 +6,7 @@ const { rgPath } = require('@vscode/ripgrep');
 const { buildArgs, parseMatch } = require('./search');
 const { openQuickSearch } = require('./quickSearch');
 const { createSyntax } = require('./syntax');
+const { getPreviewRange } = require('./preview');
 
 function activate(context) {
   let panel, processes = [], generation = 0, matches = [], originalColumn;
@@ -67,30 +68,42 @@ function activate(context) {
     }
     if (batch.length && panel && current === generation && active === syntaxGeneration) panel.webview.postMessage({type:'resultSyntax', items:batch});
   }
+  let previewSequence = 0, previewRequest = 0;
   async function preview(id) {
-    const item = matches[id]; if (!item || !panel) return;
+    const item = matches[id], sequence = ++previewSequence; if (!item || !panel) return;
     try {
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.file));
-      if (matches[id] !== item || !panel) return;
-      const start = Math.max(0, item.line - 4), end = Math.min(doc.lineCount, item.line + 6);
-      const lines = []; for (let i=start; i<end; i++) lines.push({number:i+1, text:doc.lineAt(i).text, active:i===item.line});
-      const active = syntaxGeneration, current = generation;
+      if (matches[id] !== item || !panel || sequence !== previewSequence) return;
+      panel.webview.postMessage({type:'previewInfo', id, label:item.label, lineCount:doc.lineCount, line:item.line, start:item.start, end:item.end});
+    } catch (error) { if (panel && sequence === previewSequence) panel.webview.postMessage({type:'previewError', id, message:error.message}); }
+  }
+  async function previewLines(id, requestedStart, requestedEnd, serial) {
+    const item = matches[id], sequence = previewSequence, current = generation, active = syntaxGeneration, request = ++previewRequest;
+    if (!item || !panel) return;
+    try {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.file));
+      const range = getPreviewRange(requestedStart, requestedEnd, doc.lineCount);
+      const lines = [];
+      for (let i=range.start; i<range.end; i++) lines.push({number:i+1, text:doc.lineAt(i).text, active:i===item.line});
       try {
         const grammar = await syntax.grammarFor(item.file, doc.languageId);
         if (grammar) {
           let state = null, total = 0;
-          // Tokenize preceding lines to preserve multiline grammar state where practical.
-          const contextStart = start < 5000 ? 0 : start;
-          for (let i=contextStart; i<end; i++) {
+          const contextStart = range.start < 5000 ? 0 : range.start;
+          for (let i=contextStart; i<range.end; i++) {
+            if (i % 200 === 0) {
+              await new Promise(resolve => setImmediate(resolve));
+              if (sequence !== previewSequence || request !== previewRequest || active !== syntaxGeneration || current !== generation || !panel) return;
+            }
             const text = doc.lineAt(i).text; total += text.length;
             if (total > 2000000 || text.length > 20000) { state = null; continue; }
             const tokenized = syntax.tokenize(grammar, text, state); state = tokenized.state;
-            if (i >= start) lines[i-start].spans = tokenized.spans;
+            if (i >= range.start) lines[i-range.start].spans = tokenized.spans;
           }
         }
       } catch { /* Use the webview fallback if highlighting fails. */ }
-      if (current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'preview', id, label:item.label, lines, start:item.start, end:item.end});
-    } catch (e) { panel.webview.postMessage({type:'previewError', id, message:e.message}); }
+      if (sequence === previewSequence && request === previewRequest && current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'previewLines', id, serial, first:range.start, lines});
+    } catch (error) { if (panel && sequence === previewSequence && request === previewRequest) panel.webview.postMessage({type:'previewError',id,message:error.message}); }
   }
   context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.quick', () => {
     const selected = vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '';
@@ -111,6 +124,7 @@ function activate(context) {
       if (message.type === 'ready') webview.postMessage({type:'init', folders:(vscode.workspace.workspaceFolders || []).map(f=>({name:f.name, uri:f.uri.toString()})), query:selected.includes('\n')?'':selected});
       else if (message.type === 'search') search(message.options);
       else if (message.type === 'preview') preview(message.id);
+      else if (message.type === 'previewLines' && Number.isInteger(message.id)) previewLines(message.id, message.start, message.end, message.serial);
       else if (message.type === 'highlightResults' && Array.isArray(message.ids)) highlightResults(message.ids.filter(Number.isInteger));
       else if (message.type === 'open') { const item=matches[message.id]; if (!item) return; const column=originalColumn; panel.dispose(); const doc=await vscode.workspace.openTextDocument(vscode.Uri.file(item.file)); const editor=await vscode.window.showTextDocument(doc,{viewColumn:column, preview:false}); const range=new vscode.Range(item.line,item.start,item.line,item.end); editor.selection=new vscode.Selection(range.start,range.end); editor.revealRange(range,vscode.TextEditorRevealType.InCenter); }
       else if (message.type === 'close') panel?.dispose();
