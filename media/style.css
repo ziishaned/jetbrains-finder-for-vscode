@@ -10,3 +10,7 @@ footer .new-tab input{appearance:none;-webkit-appearance:none;display:grid;place
 footer{background:var(--vscode-titleBar-activeBackground,var(--vscode-editorWidget-background));border-top:0;}
 header{border:1px solid var(--vscode-input-border,var(--vscode-editorWidget-border,var(--vscode-panel-border)));}
 html,body,#app{background-color:var(--vscode-titleBar-activeBackground,var(--vscode-editor-background));}
+
+.scopes{padding-left:8px;padding-right:8px}.preview-head{padding-left:8px;padding-right:8px}footer{padding-left:8px;padding-right:8px}
+
+header{min-height:32px;padding:2px 8px}#query{padding:2px 6px}.toggle{padding:3px}
