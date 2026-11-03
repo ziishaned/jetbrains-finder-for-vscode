@@ -1,8 +1,8 @@
 {
-  "name": "jetbrains-replace-in-files",
-  "displayName": "JetBrains Replace in Files for VS Code",
-  "description": "Find and replace across your workspace with live results and code preview.",
-  "version": "0.1.12",
+  "name": "jetbrains-find-in-files",
+  "displayName": "JetBrains Finder for VS Code",
+  "description": "Search your workspace with a live results list and code preview.",
+  "version": "0.3.66",
   "publisher": "ziishaned",
   "engines": {
     "vscode": "^1.85.0"
@@ -12,40 +12,40 @@
   ],
   "main": "./src/extension.js",
   "activationEvents": [
-    "onCommand:jetbrainsReplacer.open"
+    "onCommand:jetbrainsFinder.open"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "jetbrainsReplacer.open",
-        "title": "Replace in Files",
-        "category": "JetBrains Replace"
+        "command": "jetbrainsFinder.open",
+        "title": "Find in Files",
+        "category": "JetBrains Finder"
       }
     ],
     "keybindings": [
       {
-        "command": "jetbrainsReplacer.open",
-        "key": "ctrl+shift+h",
-        "mac": "cmd+shift+r",
+        "command": "jetbrainsFinder.open",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
         "when": "!inDebugRepl"
       },
       {
-        "command": "jetbrainsReplacer.quickOpen",
+        "command": "jetbrainsFinder.quickOpen",
         "key": "ctrl+p",
         "mac": "cmd+p",
-        "when": "activeWebviewPanelId == jetbrainsReplacer"
+        "when": "activeWebviewPanelId == jetbrainsFinder"
       },
       {
-        "command": "jetbrainsReplacer.quickOpen",
+        "command": "jetbrainsFinder.quickOpen",
         "key": "ctrl+shift+o",
         "mac": "cmd+shift+o",
-        "when": "activeWebviewPanelId == jetbrainsReplacer"
+        "when": "activeWebviewPanelId == jetbrainsFinder"
       },
       {
-        "command": "jetbrainsReplacer.commands",
+        "command": "jetbrainsFinder.commands",
         "key": "ctrl+shift+p",
         "mac": "cmd+shift+p",
-        "when": "activeWebviewPanelId == jetbrainsReplacer"
+        "when": "activeWebviewPanelId == jetbrainsFinder"
       }
     ]
   },
@@ -64,5 +64,9 @@
   "devDependencies": {
     "@vscode/vsce": "^3.6.0"
   },
-  "icon": "assets/replace-icon.png"
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziishaned/vscode-jetbrains-finder.git"
+  }
 }
