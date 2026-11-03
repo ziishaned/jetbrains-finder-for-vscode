@@ -141,7 +141,16 @@ function activate(context) {
       else if (message.type === 'highlightResults' && Array.isArray(message.ids)) highlightResults(message.ids.filter(Number.isInteger));
       else if (message.type === 'open') { const item=matches[message.id]; if (!item) return; const column=originalColumn; panel.dispose(); const doc=await vscode.workspace.openTextDocument(vscode.Uri.file(item.file)); const editor=await vscode.window.showTextDocument(doc,{viewColumn:column, preview:false}); const range=new vscode.Range(item.line,item.start,item.line,item.end); editor.selection=new vscode.Selection(range.start,range.end); editor.revealRange(range,vscode.TextEditorRevealType.InCenter); }
       else if (message.type === 'close') panel?.dispose();
-      else if (message.type === 'native') { panel.dispose(); await vscode.commands.executeCommand('workbench.action.findInFiles',{query:message.options.query,isRegex:message.options.regex,isCaseSensitive:message.options.caseSensitive,matchWholeWord:message.options.wholeWord,filesToInclude:message.options.mask}); }
+      else if (message.type === 'native') {
+        const options = message.options;
+        panel.dispose();
+        if (message.newTab) {
+          const folder = options.scope === 'folder' && options.root ? vscode.Uri.parse(options.root).fsPath : options.scope === 'directory' ? options.directory : undefined;
+          await vscode.commands.executeCommand('search.action.openNewEditor', {query:options.query, isRegexp:options.regex, isCaseSensitive:options.caseSensitive, matchWholeWord:options.wholeWord, filesToInclude:folder || options.mask, triggerSearch:true});
+        } else {
+          await vscode.commands.executeCommand('workbench.action.findInFiles',{query:options.query,isRegex:options.regex,isCaseSensitive:options.caseSensitive,matchWholeWord:options.wholeWord,filesToInclude:options.mask});
+        }
+      }
     });
   }));
 }
