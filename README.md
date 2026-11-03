@@ -2,7 +2,7 @@
 
 Search a workspace in a JetBrains-inspired view with live results and a preview of the selected match. On recent versions of VS Code, the view can open as a floating modal editor over your code.
 
-<img width="1604" height="1192" alt="2026-11-03 at 3 41 15 AM@2x" src="https://github.com/user-attachments/assets/5f2ee5bc-3658-45a0-a57f-c61a0c76798b" />
+<img width="3976" height="2494" alt="CleanShot 2026-11-03 at 3 45 31 AM@2x" src="https://github.com/user-attachments/assets/3dbe443a-c174-4ec6-9419-b07d4461a80c" />
 
 ## Enable the modal
 
