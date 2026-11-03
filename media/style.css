@@ -9,3 +9,4 @@ footer .new-tab input{appearance:none;-webkit-appearance:none;display:grid;place
 .dialog,header,.scopes,#results,.splitter,.preview-head{background-color:var(--vscode-titleBar-activeBackground,var(--vscode-editorWidget-background));}
 footer{background:var(--vscode-titleBar-activeBackground,var(--vscode-editorWidget-background));border-top:0;}
 header{border:1px solid var(--vscode-input-border,var(--vscode-editorWidget-border,var(--vscode-panel-border)));}
+html,body,#app{background-color:var(--vscode-titleBar-activeBackground,var(--vscode-editor-background));}
