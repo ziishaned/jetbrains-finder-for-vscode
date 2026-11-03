@@ -6,11 +6,11 @@ const query=$('query'), results=$('results'), preview=$('preview'), splitter=$('
 const savedState=vscode.getState()||{};
 let previewRatio=Number.isFinite(savedState.previewRatio)?Math.max(.08,Math.min(.85,savedState.previewRatio)):.47;
 preview.style.height=`${previewRatio*100}%`;
-let items=[], selected=-1, scope='project', timer, request=0, workspaceFolders=[], selectedRoot='';
+let items=[], selected=-1, scope='project', timer, workspaceFolders=[], selectedRoot='';
 let previewInfo, previewSerial=0, previewFrame, selectedDirectory='';
 
 const options=()=>({query:query.value,caseSensitive:$('case').getAttribute('aria-pressed')==='true',wholeWord:$('word').getAttribute('aria-pressed')==='true',regex:$('regex').getAttribute('aria-pressed')==='true',scope,root:selectedRoot,directory:selectedDirectory});
-function schedule(){ $('clearQuery').hidden=!query.value; previewInfo=undefined; previewSerial++; clearTimeout(timer); items=[]; selected=-1; request++; results.classList.add('empty-state'); results.innerHTML=query.value?'<div class="empty">Searching…</div>':'<div class="empty">Type search query to find in files</div>'; preview.hidden=true; splitter.hidden=true; $('previewHead').hidden=true; $('native').disabled=!query.value; $('status').textContent=''; preview.innerHTML='<div class="empty">Select a result to preview its context.</div>'; $('previewHead').textContent='Preview'; timer=setTimeout(()=>vscode.postMessage({type:'search',options:options()}),180); }
+function schedule(){ $('clearQuery').hidden=!query.value; previewInfo=undefined; previewSerial++; clearTimeout(timer); items=[]; selected=-1; results.classList.add('empty-state'); results.innerHTML=query.value?'<div class="empty">Searching…</div>':'<div class="empty">Type search query to find in files</div>'; preview.hidden=true; splitter.hidden=true; $('previewHead').hidden=true; $('native').disabled=!query.value; $('status').textContent=''; preview.innerHTML='<div class="empty">Select a result to preview its context.</div>'; $('previewHead').textContent='Preview'; timer=setTimeout(()=>vscode.postMessage({type:'search',options:options()}),180); }
 function select(index){if (!items.length) return; previewInfo=undefined; previewSerial++; selected=Math.max(0,Math.min(index,items.length-1)); for(const el of results.querySelectorAll('.result')) el.classList.toggle('selected',Number(el.dataset.id)===selected); results.querySelector(`[data-id="${selected}"]`)?.scrollIntoView({block:'nearest'}); vscode.postMessage({type:'preview',id:selected,columns:previewColumns()});}
 function renderThemed(container,text,spans,start,end){
   if(!Array.isArray(spans)){window.renderSyntax(container,text,container.dataset.file||'',start,end);return;}

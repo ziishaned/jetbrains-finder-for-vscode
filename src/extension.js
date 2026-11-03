@@ -3,7 +3,6 @@ const { spawn } = require('child_process');
 const readline = require('readline');
 const { rgPath } = require('@vscode/ripgrep');
 const { buildArgs, parseMatch, selectSearchRoots } = require('./search');
-const { openQuickSearch } = require('./quickSearch');
 const { createSyntax } = require('./syntax');
 const { getPreviewRange, createRowMap, rowPosition, segmentRange, matchRow, resultSnippet } = require('./preview');
 
@@ -108,10 +107,6 @@ function activate(context) {
       if (sequence === previewSequence && request === previewRequest && current === generation && active === syntaxGeneration && matches[id] === item && panel) panel.webview.postMessage({type:'previewLines', id, serial, first:range.start, lines});
     } catch (error) { if (panel && sequence === previewSequence && request === previewRequest) panel.webview.postMessage({type:'previewError',id,message:error.message}); }
   }
-  context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.quick', () => {
-    const selected = vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '';
-    openQuickSearch(selected.includes('\n') ? '' : selected, query => vscode.commands.executeCommand('jetbrainsFinder.open', query));
-  }));
   context.subscriptions.push(vscode.commands.registerCommand('jetbrainsFinder.open', (initialQuery) => {
     const selected = typeof initialQuery === 'string' ? initialQuery : (vscode.window.activeTextEditor?.document.getText(vscode.window.activeTextEditor.selection) || '');
     if (panel) { panel.reveal(); panel.webview.postMessage({type:'focus', query:selected.includes('\n') ? '' : selected}); return; }
@@ -146,9 +141,9 @@ function activate(context) {
         panel.dispose();
         if (message.newTab) {
           const folder = options.scope === 'folder' && options.root ? vscode.Uri.parse(options.root).fsPath : options.scope === 'directory' ? options.directory : undefined;
-          await vscode.commands.executeCommand('search.action.openNewEditor', {query:options.query, isRegexp:options.regex, isCaseSensitive:options.caseSensitive, matchWholeWord:options.wholeWord, filesToInclude:folder || options.mask, triggerSearch:true});
+          await vscode.commands.executeCommand('search.action.openNewEditor', {query:options.query, isRegexp:options.regex, isCaseSensitive:options.caseSensitive, matchWholeWord:options.wholeWord, filesToInclude:folder, triggerSearch:true});
         } else {
-          await vscode.commands.executeCommand('workbench.action.findInFiles',{query:options.query,isRegex:options.regex,isCaseSensitive:options.caseSensitive,matchWholeWord:options.wholeWord,filesToInclude:options.mask});
+          await vscode.commands.executeCommand('workbench.action.findInFiles',{query:options.query,isRegex:options.regex,isCaseSensitive:options.caseSensitive,matchWholeWord:options.wholeWord});
         }
       }
     });

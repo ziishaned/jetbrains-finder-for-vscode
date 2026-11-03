@@ -17,10 +17,9 @@ This is a VS Code-wide preference: **other editors may also open as modals**. Th
 Open a folder or workspace, then press **Cmd+Shift+F** on macOS or **Ctrl+Shift+F** on Windows/Linux. You can also run **JetBrains Finder: Find in Files** from the Command Palette. A single-line editor selection is used as the initial query.
 
 - Toggle case sensitivity, whole-word matching, and regular expressions beside the search field.
-- Search the whole workspace, a workspace folder, or a directory relative to each workspace folder. A file mask accepts comma-separated ripgrep globs such as `*.ts, *.tsx`.
+- Search the whole workspace, a workspace folder, or a directory relative to each workspace folder.
 - Use the arrow keys to select a result, Enter to open it, and Escape to close the view. Clicking previews; double-clicking opens.
 - **Open in Search View** transfers the query and search options to VS Code's built-in search.
-- **JetBrains Finder: Find in Files (Quick Pick)** provides a separate native quick-search list.
 
 ## Install and develop
 
@@ -30,4 +29,4 @@ The default shortcut replaces VS Code's built-in Find in Files shortcut while th
 
 ## Current limitations
 
-The Quick Pick uses VS Code's native layout and cannot embed the custom code preview; it searches the whole workspace without directory or file-mask controls. The extension uses ripgrep to search files on disk, respects ignore files and boolean `search.exclude` entries, and limits results to the first 1,000 matches. Unsaved edits are shown in the preview but are not included in search results until saved. Search supports file-based workspaces on the local or remote extension host; virtual workspaces are not supported. Directory and file-mask scopes are approximations of JetBrains scopes; JetBrains modules and named scopes are not available. Previews are plain text rather than syntax-highlighted editors. Open in Search View transfers the query, options, and mask, but not the selected workspace folder or directory.
+The extension uses ripgrep to search files on disk, respects ignore files and boolean `search.exclude` entries, and limits results to the first 1,000 matches. Unsaved edits are shown in the preview but are not included in search results until saved. Search supports file-based workspaces on the local or remote extension host; virtual workspaces are not supported. Directory scopes are approximations of JetBrains scopes; JetBrains modules and named scopes are not available. Open in Search View transfers the query and options, but not the selected workspace folder or directory.

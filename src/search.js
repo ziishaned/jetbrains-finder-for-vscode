@@ -6,9 +6,6 @@ function buildArgs(options, excludes = {}) {
   if (!options.caseSensitive) args.push('--ignore-case');
   if (options.wholeWord) args.push('--word-regexp');
   if (!options.regex) args.push('--fixed-strings');
-  if (options.mask && options.mask.trim()) {
-    for (const mask of options.mask.split(',').map(s => s.trim()).filter(Boolean)) args.push('--glob', mask);
-  }
   args.push('--', options.query, '.');
   return args;
 }

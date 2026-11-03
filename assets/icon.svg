@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <image href="jetbrains-reference.png" width="256" height="256"/>
+  <circle cx="158.5" cy="131.5" r="21.5" fill="none" stroke="#fff" stroke-width="8"/>
+  <path d="m174 147 17 17" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+</svg>
