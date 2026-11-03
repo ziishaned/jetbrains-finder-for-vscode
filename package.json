@@ -1,0 +1,57 @@
+{
+  "name": "jetbrains-find-in-files",
+  "displayName": "JetBrains-style Find in Files",
+  "description": "Search your workspace with a live results list and code preview.",
+  "version": "0.3.13",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onCommand:jetbrainsFinder.open"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "jetbrainsFinder.open",
+        "title": "Find in Files",
+        "category": "JetBrains Finder"
+      },
+      {
+        "command": "jetbrainsFinder.quick",
+        "title": "Find in Files (Quick Pick)",
+        "category": "JetBrains Finder"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jetbrainsFinder.open",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "!inDebugRepl"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "package": "vsce package --allow-missing-repository",
+    "build:syntax": "esbuild media/syntax-source.js --bundle --minify --platform=browser --outfile=media/syntax.js"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.46-24",
+    "@vscode/ripgrep": "^1.18.0",
+    "highlight.js": "^11.12.0",
+    "jsonc-parser": "^3.3.1",
+    "plist": "^3.1.1",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.2"
+  }
+}

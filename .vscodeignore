@@ -1,0 +1,11 @@
+.gitignore
+.vscodeignore
+test/**
+node_modules/@vscode/codicons/src/**
+node_modules/@vscode/codicons/dist/*.html
+node_modules/@vscode/codicons/dist/*.svg
+node_modules/@vscode/codicons/dist/*.csv
+node_modules/@vscode/codicons/dist/*.ts
+node_modules/@vscode/codicons/dist/*.json
+
+node_modules/highlight.js/**
