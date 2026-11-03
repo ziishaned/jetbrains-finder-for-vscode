@@ -4,7 +4,16 @@
   "description": "Search your workspace with a live results list and code preview.",
   "version": "0.3.66",
   "publisher": "ziishaned",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/ziishaned/jetbrains-finder-for-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/ziishaned/jetbrains-finder-for-vscode/issues"
+  },
+  "keywords": [
+    "find in files",
+    "search",
+    "jetbrains"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
