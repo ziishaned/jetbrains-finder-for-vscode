@@ -11,7 +11,7 @@ let previewInfo, previewSerial=0, previewFrame;
 
 const options=()=>({query:query.value,caseSensitive:$('case').getAttribute('aria-pressed')==='true',wholeWord:$('word').getAttribute('aria-pressed')==='true',regex:$('regex').getAttribute('aria-pressed')==='true',scope,root:$('roots').value,directory:$('directory').value});
 function schedule(){ previewInfo=undefined; previewSerial++; clearTimeout(timer); items=[]; selected=-1; request++; results.classList.add('empty-state'); results.innerHTML=query.value?'<div class="empty">Searching…</div>':'<div class="empty">Type search query to find in files</div>'; preview.hidden=true; splitter.hidden=true; $('previewHead').hidden=true; $('native').disabled=!query.value; $('status').textContent=''; preview.innerHTML='<div class="empty">Select a result to preview its context.</div>'; $('previewHead').textContent='Preview'; timer=setTimeout(()=>vscode.postMessage({type:'search',options:options()}),180); }
-function select(index){if (!items.length) return; previewInfo=undefined; previewSerial++; selected=Math.max(0,Math.min(index,items.length-1)); for(const el of results.querySelectorAll('.result')) el.classList.toggle('selected',Number(el.dataset.id)===selected); results.querySelector(`[data-id="${selected}"]`)?.scrollIntoView({block:'nearest'}); vscode.postMessage({type:'preview',id:selected});}
+function select(index){if (!items.length) return; previewInfo=undefined; previewSerial++; selected=Math.max(0,Math.min(index,items.length-1)); for(const el of results.querySelectorAll('.result')) el.classList.toggle('selected',Number(el.dataset.id)===selected); results.querySelector(`[data-id="${selected}"]`)?.scrollIntoView({block:'nearest'}); vscode.postMessage({type:'preview',id:selected,columns:previewColumns()});}
 function renderThemed(container,text,spans,start,end){
   if(!Array.isArray(spans)){window.renderSyntax(container,text,container.dataset.file||'',start,end);return;}
   container.textContent='';
@@ -50,6 +50,11 @@ splitter.addEventListener('keydown',event=>{
   if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;
   event.preventDefault();resizePreview(preview.getBoundingClientRect().height+(event.key==='ArrowUp'?16:-16));
 });
+function previewColumns(){
+  const style=getComputedStyle(preview), canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+  ctx.font=`${style.fontSize} ${style.fontFamily}`;
+  return Math.max(20,Math.min(500,Math.floor((preview.clientWidth-76)/Math.max(1,ctx.measureText('M').width))));
+}
 function lineHeight(){return (parseFloat(getComputedStyle(preview).fontSize)||13)*1.65;}
 function requestPreviewLines(){
   if(!previewInfo||previewInfo.id!==selected)return;
@@ -58,16 +63,16 @@ function requestPreviewLines(){
   vscode.postMessage({type:'previewLines',id:selected,start,end,serial:++previewSerial});
 }
 preview.addEventListener('scroll',()=>{if(previewFrame)cancelAnimationFrame(previewFrame);previewFrame=requestAnimationFrame(()=>{previewFrame=undefined;requestPreviewLines();});});
-new ResizeObserver(()=>{if(previewInfo)requestPreviewLines();}).observe(preview);
+new ResizeObserver(()=>{if(previewInfo){const columns=previewColumns();if(columns!==previewInfo.columns){previewInfo=undefined;previewSerial++;vscode.postMessage({type:'preview',id:selected,columns});}else requestPreviewLines();}}).observe(preview);
 function drawPreview(m){
   const height=lineHeight(), info=previewInfo;
   const fragment=document.createDocumentFragment();
   const top=document.createElement('div');top.style.height=`${m.first*height}px`;fragment.append(top);
-  for(const line of m.lines){const row=document.createElement('div');row.className='line'+(line.active?' active-line':'');const num=document.createElement('span');num.className='number';num.textContent=line.number;const text=document.createElement('span');text.className='code';text.dataset.file=info.label;renderThemed(text,line.text,line.spans,line.active?info.start:undefined,line.active?info.end:undefined);row.append(num,text);fragment.append(row);}
+  for(const line of m.lines){const row=document.createElement('div');row.className='line'+(line.active?' active-line':'');const num=document.createElement('span');num.className='number';num.textContent=line.number;const text=document.createElement('span');text.className='code';text.dataset.file=info.label;renderThemed(text,line.text,line.spans,line.active?info.start-line.from:undefined,line.active?info.end-line.from:undefined);row.append(num,text);fragment.append(row);}
   const bottom=document.createElement('div');bottom.style.height=`${Math.max(0,info.lineCount-m.first-m.lines.length)*height}px`;fragment.append(bottom);
   preview.replaceChildren(fragment);
 }
-function append(item){ const row=document.createElement('div'); row.className='result'; row.dataset.id=item.id; row.setAttribute('role','option'); const content=document.createElement('span'); content.className='result-text'; window.renderSyntax(content,item.text,item.label,item.start,item.end); const file=document.createElement('span'); file.className='file'; file.textContent=`${item.label}:${item.line+1}`; row.append(content,file); row.addEventListener('click',()=>select(item.id)); row.addEventListener('dblclick',()=>vscode.postMessage({type:'open',id:item.id})); results.append(row); }
+function append(item){ const row=document.createElement('div'); row.className='result'; row.dataset.id=item.id; row.setAttribute('role','option'); const content=document.createElement('span'); content.className='result-text'; window.renderSyntax(content,item.snippet.text,item.label,item.snippet.start,item.snippet.end); const file=document.createElement('span'); file.className='file'; file.textContent=`${item.label}:${item.line+1}`; row.append(content,file); row.addEventListener('click',()=>select(item.id)); row.addEventListener('dblclick',()=>vscode.postMessage({type:'open',id:item.id})); results.append(row); }
 for(const id of ['case','word','regex']) $(id).addEventListener('click',()=>{$(id).setAttribute('aria-pressed',String($(id).getAttribute('aria-pressed')!=='true'));schedule();});
 query.addEventListener('input',schedule); $('directory').addEventListener('input',schedule); $('roots').addEventListener('change',schedule);
 for(const button of document.querySelectorAll('.scope')) button.addEventListener('click',()=>{scope=button.dataset.scope; document.querySelectorAll('.scope').forEach(b=>b.classList.toggle('active',b===button)); $('roots').hidden=scope!=='folder'; $('directory').hidden=scope!=='directory'; schedule();});
@@ -86,7 +91,7 @@ window.addEventListener('message',event=>{const m=event.data;
    preview.scrollTop=Math.max(0,(m.line+0.5)*lineHeight()-preview.clientHeight/2);requestPreviewLines();
  }
  if(m.type==='previewLines' && previewInfo && m.id===selected && m.serial===previewSerial)drawPreview(m);
- if(m.type==='resultSyntax'){for(const result of m.items){const item=items[result.id],element=results.querySelector(`[data-id="${result.id}"] .result-text`);if(item&&element)renderThemed(element,item.text,result.spans,item.start,item.end);}}
+ if(m.type==='resultSyntax'){for(const result of m.items){const item=items[result.id],element=results.querySelector(`[data-id="${result.id}"] .result-text`);if(item&&element)renderThemed(element,item.snippet.text,result.spans,item.snippet.start,item.snippet.end);}}
  if(m.type==='refreshSyntax'){if(items.length)vscode.postMessage({type:'highlightResults',ids:items.map(item=>item.id)});if(previewInfo)requestPreviewLines();}
  if(m.type==='previewError' && m.id===selected)preview.textContent=m.message;
 });
