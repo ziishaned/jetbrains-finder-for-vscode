@@ -28,6 +28,7 @@ function renderThemed(container,text,spans,start,end){
     container.append(part);
   }
 }
+let resizing=false, previewResizeTimer;
 function resizePreview(requestedHeight){
   const dialogHeight=document.querySelector('.dialog').clientHeight;
   const available=preview.getBoundingClientRect().height+results.getBoundingClientRect().height;
@@ -36,19 +37,19 @@ function resizePreview(requestedHeight){
   const height=Math.max(minimum,Math.min(maximum,requestedHeight));
   previewRatio=height/dialogHeight;preview.style.height=`${previewRatio*100}%`;
   splitter.setAttribute('aria-valuenow',String(Math.round(100*(available-height)/available)));
-  vscode.setState({...vscode.getState(),previewRatio});
 }
+function savePreviewSize(){vscode.setState({...vscode.getState(),previewRatio});}
 splitter.addEventListener('pointerdown',event=>{
   if(event.button!==0)return;
-  event.preventDefault();splitter.setPointerCapture(event.pointerId);
+  event.preventDefault();resizing=true;splitter.classList.add('dragging');splitter.setPointerCapture(event.pointerId);
   const initialY=event.clientY,initialHeight=preview.getBoundingClientRect().height;
   const move=e=>resizePreview(initialHeight+initialY-e.clientY);
-  const finish=()=>{splitter.removeEventListener('pointermove',move);splitter.removeEventListener('pointerup',finish);splitter.removeEventListener('pointercancel',finish);};
-  splitter.addEventListener('pointermove',move);splitter.addEventListener('pointerup',finish);splitter.addEventListener('pointercancel',finish);
+  const finish=()=>{resizing=false;splitter.classList.remove('dragging');savePreviewSize();clearTimeout(previewResizeTimer);if(previewInfo)requestPreviewLines();splitter.removeEventListener('pointermove',move);splitter.removeEventListener('pointerup',finish);splitter.removeEventListener('pointercancel',finish);splitter.removeEventListener('lostpointercapture',finish);};
+  splitter.addEventListener('pointermove',move);splitter.addEventListener('pointerup',finish);splitter.addEventListener('pointercancel',finish);splitter.addEventListener('lostpointercapture',finish);
 });
 splitter.addEventListener('keydown',event=>{
   if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;
-  event.preventDefault();resizePreview(preview.getBoundingClientRect().height+(event.key==='ArrowUp'?16:-16));
+  event.preventDefault();resizePreview(preview.getBoundingClientRect().height+(event.key==='ArrowUp'?16:-16));savePreviewSize();
 });
 function previewColumns(){
   const style=getComputedStyle(preview), canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
@@ -63,7 +64,13 @@ function requestPreviewLines(){
   vscode.postMessage({type:'previewLines',id:selected,start,end,serial:++previewSerial});
 }
 preview.addEventListener('scroll',()=>{if(previewFrame)cancelAnimationFrame(previewFrame);previewFrame=requestAnimationFrame(()=>{previewFrame=undefined;requestPreviewLines();});});
-new ResizeObserver(()=>{if(previewInfo){const columns=previewColumns();if(columns!==previewInfo.columns){previewInfo=undefined;previewSerial++;vscode.postMessage({type:'preview',id:selected,columns});}else requestPreviewLines();}}).observe(preview);
+new ResizeObserver(()=>{
+  if(!previewInfo)return;
+  const columns=previewColumns();
+  if(columns!==previewInfo.columns){previewInfo=undefined;previewSerial++;vscode.postMessage({type:'preview',id:selected,columns});}
+  else if(resizing){clearTimeout(previewResizeTimer);previewResizeTimer=setTimeout(requestPreviewLines,100);}
+  else requestPreviewLines();
+}).observe(preview);
 function drawPreview(m){
   const height=lineHeight(), info=previewInfo;
   const fragment=document.createDocumentFragment();

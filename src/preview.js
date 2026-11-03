@@ -26,7 +26,6 @@ function matchRow(map, doc, line, character) {
 }
 function resultSnippet(item, context=40, length=140) {
   const from=Math.max(0,item.start-context), to=Math.min(item.text.length,Math.max(from+length,item.end));
-  const prefix=from?'…':'';
-  return {text:prefix+item.text.slice(from,to)+(to<item.text.length?'…':''),start:item.start-from+prefix.length,end:item.end-from+prefix.length};
+  return {text:item.text.slice(from,to)+(to<item.text.length?'…':''),start:item.start-from,end:item.end-from};
 }
 module.exports = { getPreviewRange, createRowMap, rowPosition, segmentBoundary, matchRow, resultSnippet };

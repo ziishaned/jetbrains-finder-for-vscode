@@ -20,7 +20,7 @@ test('long lines wrap into scrollable rows and keep the selected match visible',
   assert.equal(text.slice(segmentBoundary(text,120),segmentBoundary(text,160)).endsWith('somet'),true);
   const snippet=resultSnippet({text,start:155,end:164});
   assert.equal(snippet.text.slice(snippet.start,snippet.end),'something');
-  assert.ok(snippet.text.startsWith('…'));
+  assert.equal(snippet.text.startsWith('…'),false);
   assert.deepEqual(rowPosition(map,map.count-1),{line:1,part:5});
 });
 
