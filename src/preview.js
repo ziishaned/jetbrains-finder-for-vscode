@@ -5,9 +5,28 @@ function getPreviewRange(start, end, lineCount) {
 }
 function createRowMap(doc, columns) {
   const width = Math.max(20, Math.min(500, Math.floor(columns) || 100));
-  const offsets = [0];
-  for (let i = 0; i < doc.lineCount; i++) offsets.push(offsets[i] + Math.max(1, Math.ceil(doc.lineAt(i).text.length / width)));
-  return { width, offsets, count:offsets[offsets.length - 1] };
+  const offsets = [0], breaks = new Map();
+  // A final newline creates an empty second VS Code line; it is still a single-line file.
+  const singleLine = doc.lineCount === 1 || (doc.lineCount === 2 && doc.lineAt(1).text === '');
+  for (let i = 0; i < doc.lineCount; i++) {
+    const text=doc.lineAt(i).text, starts=[0];
+    let start=0;
+    while(singleLine && start+width<text.length){
+      let end=segmentBoundary(text,start+width);
+      // Prefer a nearby whitespace boundary, retaining every character.
+      const min=start+Math.floor(width/2);
+      for(let j=end-1;j>=min;j--)if(/\s/u.test(text[j])){end=j+1;break;}
+      if(end<=start)end=segmentBoundary(text,start+width);
+      starts.push(end);start=end;
+    }
+    if(starts.length>1)breaks.set(i,starts);
+    offsets.push(offsets[i]+starts.length);
+  }
+  return { width, offsets, breaks, count:offsets[offsets.length - 1] };
+}
+function segmentRange(map, line, part, text) {
+  const starts=map.breaks.get(line);
+  return {from:starts ? starts[part] : 0, to:starts && part+1<starts.length ? starts[part+1] : text.length};
 }
 function rowPosition(map, row) {
   let low=0, high=map.offsets.length-1;
@@ -19,10 +38,11 @@ function segmentBoundary(text, position) {
   return Math.min(position,text.length);
 }
 function matchRow(map, doc, line, character) {
-  const text=doc.lineAt(line).text;
-  let part=Math.min(map.offsets[line+1]-map.offsets[line]-1,Math.floor(character/map.width));
-  if (part+1<map.offsets[line+1]-map.offsets[line] && character >= segmentBoundary(text,(part+1)*map.width)) part++;
-  return map.offsets[line]+part;
+  const starts=map.breaks.get(line);
+  if(!starts)return map.offsets[line];
+  let low=0,high=starts.length;
+  while(low+1<high){const mid=Math.floor((low+high)/2);if(starts[mid]<=character)low=mid;else high=mid;}
+  return map.offsets[line]+low;
 }
 function resultSnippet(item, context=40, length=140) {
   const text=item.text, isWord = character => character !== undefined && /[\p{L}\p{N}\p{M}_]/u.test(character);
@@ -38,4 +58,4 @@ function resultSnippet(item, context=40, length=140) {
   const to=Math.min(text.length,Math.max(from+length,item.end));
   return {text:text.slice(from,to),start:item.start-from,end:item.end-from};
 }
-module.exports = { getPreviewRange, createRowMap, rowPosition, segmentBoundary, matchRow, resultSnippet };
+module.exports = { getPreviewRange, createRowMap, rowPosition, segmentBoundary, segmentRange, matchRow, resultSnippet };

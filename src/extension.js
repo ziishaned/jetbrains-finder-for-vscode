@@ -6,7 +6,7 @@ const { rgPath } = require('@vscode/ripgrep');
 const { buildArgs, parseMatch } = require('./search');
 const { openQuickSearch } = require('./quickSearch');
 const { createSyntax } = require('./syntax');
-const { getPreviewRange, createRowMap, rowPosition, segmentBoundary, matchRow, resultSnippet } = require('./preview');
+const { getPreviewRange, createRowMap, rowPosition, segmentRange, matchRow, resultSnippet } = require('./preview');
 
 function activate(context) {
   let panel, processes = [], generation = 0, matches = [], originalColumn;
@@ -90,8 +90,8 @@ function activate(context) {
       const lines = [];
       for (let row=range.start; row<range.end; row++) {
         const pos=rowPosition(map,row), text=doc.lineAt(pos.line).text;
-        const from=segmentBoundary(text,pos.part*map.width), to=segmentBoundary(text,(pos.part+1)*map.width);
-        lines.push({number:pos.part?'':pos.line+1, text:text.slice(from,to), active:pos.line===item.line && item.start<to && item.end>from, from, sourceLine:pos.line});
+        const {from,to}=segmentRange(map,pos.line,pos.part,text);
+        lines.push({number:pos.part?'':pos.line+1, continuation:pos.part>0, wraps:row+1<map.offsets[pos.line+1], text:text.slice(from,to), active:pos.line===item.line && item.start<to && item.end>from, from, sourceLine:pos.line});
       }
       try {
         const grammar = await syntax.grammarFor(item.file, doc.languageId);

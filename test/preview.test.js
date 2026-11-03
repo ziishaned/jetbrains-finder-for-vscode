@@ -12,16 +12,16 @@ test('preview ranges reach both ends of a file and limit each request', () => {
 test('long lines wrap into scrollable rows and keep the selected match visible', () => {
   const {createRowMap,rowPosition,segmentBoundary,matchRow,resultSnippet} = require('../src/preview');
   const text='a'.repeat(155)+'something'+'b'.repeat(40);
-  const doc={lineCount:2,lineAt:i=>({text:i===0?'short':text})};
+  const doc={lineCount:1,lineAt:()=>({text})};
   const map=createRowMap(doc,40);
-  assert.equal(map.count,7);
-  const match=matchRow(map,doc,1,155);
-  assert.deepEqual(rowPosition(map,match),{line:1,part:3});
+  assert.equal(map.count,6);
+  const match=matchRow(map,doc,0,155);
+  assert.deepEqual(rowPosition(map,match),{line:0,part:3});
   assert.equal(text.slice(segmentBoundary(text,120),segmentBoundary(text,160)).endsWith('somet'),true);
   const snippet=resultSnippet({text,start:155,end:164});
   assert.equal(snippet.text.slice(snippet.start,snippet.end),'something');
   assert.equal(snippet.text.startsWith('…'),false);
-  assert.deepEqual(rowPosition(map,map.count-1),{line:1,part:5});
+  assert.deepEqual(rowPosition(map,map.count-1),{line:0,part:5});
 });
 
 test('wrapped rows do not split a surrogate pair', () => {
@@ -47,4 +47,25 @@ test('result snippets start at a complete word and retain the correct match offs
   const full=resultSnippet({text:word,start:matched,end:matched+9}, 12);
   assert.ok(full.text.startsWith('résumé'));
   assert.equal(full.text.slice(full.start,full.end),'something');
+});
+
+test('preview wraps at word boundaries while preserving text and match positions', () => {
+  const {createRowMap,segmentRange,matchRow,rowPosition}=require('../src/preview');
+  const text='alpha bravo charlie delta echo foxtrot golf hotel india';
+  const doc={lineCount:1,lineAt:()=>({text})}, map=createRowMap(doc,20);
+  const rows=Array.from({length:map.count},(_,i)=>{const {from,to}=segmentRange(map,0,i,text);return text.slice(from,to);});
+  assert.equal(rows.join(''),text);
+  assert.equal(rows[0],'alpha bravo charlie ');
+  const character=text.indexOf('delta');
+  assert.equal(rowPosition(map,matchRow(map,doc,0,character)).part,1);
+});
+
+
+test('only single-line files wrap, including a final newline', () => {
+  const {createRowMap}=require('../src/preview');
+  const text='long text '.repeat(20);
+  const multiline={lineCount:2,lineAt:i=>({text:i===0?text:'another line'})};
+  const finalNewline={lineCount:2,lineAt:i=>({text:i===0?text:''})};
+  assert.equal(createRowMap(multiline,20).count,2);
+  assert.ok(createRowMap(finalNewline,20).count>2);
 });

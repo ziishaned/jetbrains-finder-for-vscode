@@ -54,7 +54,7 @@ splitter.addEventListener('keydown',event=>{
 function previewColumns(){
   const style=getComputedStyle(preview), canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
   ctx.font=`${style.fontSize} ${style.fontFamily}`;
-  return Math.max(20,Math.min(500,Math.floor((preview.clientWidth-76)/Math.max(1,ctx.measureText('M').width))));
+  return Math.max(20,Math.min(500,Math.floor((preview.clientWidth-84)/Math.max(1,ctx.measureText('M').width))));
 }
 function lineHeight(){return (parseFloat(getComputedStyle(preview).fontSize)||13)*1.65;}
 function requestPreviewLines(){
@@ -75,7 +75,7 @@ function drawPreview(m){
   const height=lineHeight(), info=previewInfo;
   const fragment=document.createDocumentFragment();
   const top=document.createElement('div');top.style.height=`${m.first*height}px`;fragment.append(top);
-  for(const line of m.lines){const row=document.createElement('div');row.className='line'+(line.active?' active-line':'');const num=document.createElement('span');num.className='number';num.textContent=line.number;const text=document.createElement('span');text.className='code';text.dataset.file=info.label;renderThemed(text,line.text,line.spans,line.active?info.start-line.from:undefined,line.active?info.end-line.from:undefined);row.append(num,text);fragment.append(row);}
+  for(const line of m.lines){const row=document.createElement('div');row.className='line'+(line.active?' active-line':'');const num=document.createElement('span');num.className='number';num.textContent=line.number;if(line.continuation){const marker=document.createElement('span');marker.className='wrap-start';marker.setAttribute('aria-hidden','true');row.append(num,marker);}else row.append(num);const text=document.createElement('span');text.className='code';text.dataset.file=info.label;renderThemed(text,line.text,line.spans,line.active?info.start-line.from:undefined,line.active?info.end-line.from:undefined);row.append(text);if(line.wraps){const marker=document.createElement('span');marker.className='wrap-end';marker.textContent='↩';marker.setAttribute('aria-hidden','true');row.append(marker);}fragment.append(row);}
   const bottom=document.createElement('div');bottom.style.height=`${Math.max(0,info.lineCount-m.first-m.lines.length)*height}px`;fragment.append(bottom);
   preview.replaceChildren(fragment);
 }
