@@ -2,7 +2,7 @@
   "name": "jetbrains-find-in-files",
   "displayName": "JetBrains-style Find in Files",
   "description": "Search your workspace with a live results list and code preview.",
-  "version": "0.3.36",
+  "version": "0.3.37",
   "publisher": "local",
   "engines": {
     "vscode": "^1.85.0"
