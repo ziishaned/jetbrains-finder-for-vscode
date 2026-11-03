@@ -67,6 +67,6 @@
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ziishaned/vscode-jetbrains-finder.git"
+    "url": "https://github.com/ziishaned/jetbrains-finder-for-vscode.git"
   }
 }
