@@ -7,5 +7,5 @@
 footer .new-tab input{appearance:none;-webkit-appearance:none;display:grid;place-content:center;flex:none;width:18px;height:18px;padding:0;background:var(--vscode-checkbox-background);border:1px solid var(--vscode-checkbox-border,var(--vscode-descriptionForeground));border-radius:3px;color:var(--vscode-checkbox-foreground);cursor:pointer}footer .new-tab input:checked::after{content:"";width:9px;height:5px;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-1px) rotate(-45deg)}footer .new-tab input:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:2px}
 
 .dialog,header,.scopes,#results,.splitter,.preview-head{background-color:var(--vscode-titleBar-activeBackground,var(--vscode-editorWidget-background));}
-footer{background:var(--vscode-editorWidget-background);}
+footer{background:var(--vscode-titleBar-activeBackground,var(--vscode-editorWidget-background));border-top:0;}
 header{border:1px solid var(--vscode-input-border,var(--vscode-editorWidget-border,var(--vscode-panel-border)));}
